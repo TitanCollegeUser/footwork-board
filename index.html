@@ -1,0 +1,1199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Footwork Board</title>
+<style>
+:root{--bg:#f5f3ef;--panel:#fff;--ink:#1c1c1e;--mute:#6e6e73;--line:#e2ded7;--accent:#d9480f;--lead:#2f6fde;--follow:#e0457b;--gold:#f2b01e}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:15px/1.35 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+button,.btn{font:inherit;color:inherit;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:7px 11px;cursor:pointer;touch-action:manipulation;white-space:nowrap;display:inline-flex;align-items:center;gap:5px;text-decoration:none;flex:none}
+button:disabled{opacity:.4}
+button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button.ghost{border-color:transparent;background:transparent}
+button.danger{color:#c92a2a}
+input,select,textarea{font:inherit;border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:#fff;color:var(--ink);min-width:0}
+.hidden{display:none!important}
+.mute{color:var(--mute)}.small{font-size:12.5px}
+/* ---------- library ---------- */
+#lib{max-width:760px;margin:0 auto;padding:18px 14px 90px}
+#lib h1{font-size:24px;margin:0;letter-spacing:-.3px}
+.libhead{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+.libhead .grow{flex:1}
+.libactions{display:flex;gap:8px;margin:14px 0 18px;flex-wrap:wrap}
+.folder{background:var(--panel);border:1px solid var(--line);border-radius:14px;margin-bottom:12px;overflow:hidden}
+.fhead{display:flex;align-items:center;gap:6px;padding:8px 8px 8px 12px;cursor:pointer;user-select:none}
+.fhead .name{flex:1;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fhead .caret{width:16px;color:var(--mute);transition:transform .15s}
+.folder.open .caret{transform:rotate(90deg)}
+.flist{border-top:1px solid var(--line)}
+.folder:not(.open) .flist{display:none}
+.card{display:flex;align-items:center;gap:10px;padding:10px 8px 10px 14px;border-bottom:1px solid var(--line);cursor:pointer}
+.card:last-child{border-bottom:none}
+.card .t{flex:1;min-width:0}
+.card .t b{display:block;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.badge{font-size:11.5px;padding:2px 7px;border-radius:20px;background:#efece6;color:#55534e}
+.empty{padding:14px;color:var(--mute);font-size:13.5px}
+.status{font-size:12px;color:var(--mute);white-space:nowrap}
+.status.warn{color:#b35c00}
+/* ---------- editor ---------- */
+#ed{position:fixed;inset:0;display:flex;flex-direction:column;height:100dvh}
+.topbar{display:flex;align-items:center;gap:6px;padding:6px 8px;background:var(--panel);border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none;flex:none}
+.topbar::-webkit-scrollbar,.row::-webkit-scrollbar{display:none}
+.topbar select{flex:none;padding:6px 8px}
+.topbar .cname{font-weight:650;max-width:34vw;flex:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:6px 4px;cursor:pointer}
+.main{flex:1;display:flex;min-height:0}
+#vid{width:38%;max-width:520px;min-width:300px;border-right:1px solid var(--line);background:#111;color:#eee;display:flex;flex-direction:column;flex:none}
+#vid .vbox{position:relative;flex:1;min-height:0;display:flex;align-items:center;justify-content:center;background:#000}
+#vid video{width:100%;height:100%;object-fit:contain;background:#000}
+#vid .mir{transform:scaleX(-1)}
+#ytwrap,#drive{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000}
+#ytwrap iframe{width:100%;height:100%;border:0;display:block}
+#vidEmpty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:18px;gap:10px;color:#bbb;font-size:13.5px}
+#vid .vctl{padding:8px;display:flex;flex-direction:column;gap:7px;background:#1b1b1d}
+#vid .vrow{display:flex;gap:6px;align-items:center;overflow-x:auto;scrollbar-width:none}
+#vid button,#vid .btn{background:#2a2a2d;border-color:#3a3a3e;color:#eee;padding:6px 10px}
+#vid button.on{background:#eee;color:#111}
+#vid input{background:#2a2a2d;border-color:#3a3a3e;color:#eee;flex:1;padding:6px 9px}
+#vidNote{font-size:12px;color:#aaa;min-height:15px}
+.stage{flex:1;position:relative;min-width:0;display:flex;flex-direction:column}
+#svgwrap{flex:1;position:relative;min-height:0;background:#fbfaf7}
+svg#floor{position:absolute;inset:0;width:100%;height:100%;touch-action:none;user-select:none;-webkit-user-select:none;display:block}
+.hint{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;color:var(--mute);pointer-events:none;font-size:14px;line-height:1.5;padding:0 20px}
+.bigcount{position:absolute;right:12px;top:10px;font-size:42px;font-weight:800;color:var(--accent);pointer-events:none;text-shadow:0 2px 0 #fff}
+.legend{position:absolute;left:10px;top:8px;font-size:12px;display:flex;gap:10px;pointer-events:none;color:var(--mute)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px;vertical-align:-1px}
+.bottom{background:var(--panel);border-top:1px solid var(--line);flex:none;padding-bottom:env(safe-area-inset-bottom)}
+.row{display:flex;gap:6px;align-items:center;padding:6px 8px;overflow-x:auto;scrollbar-width:none}
+.row + .row{border-top:1px solid var(--line)}
+.sep{width:1px;align-self:stretch;background:var(--line);flex:none;margin:0 2px}
+.chip{padding:6px 0;min-width:38px;justify-content:center;border-radius:20px;font-weight:650}
+.chip.amp{font-weight:500;color:var(--mute)}
+.chip.on{color:#fff}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;flex:none}
+.seg button{border:none;border-radius:0;padding:7px 10px}
+.seg button+button{border-left:1px solid var(--line)}
+.sw{width:26px;height:26px;border-radius:50%;padding:0;border:2px solid #fff;box-shadow:0 0 0 1px var(--line)}
+.lbl{font-size:12px;color:var(--mute);flex:none}
+.toggle{font-size:13px}
+/* svg items */
+.item{cursor:pointer}
+.halo{fill:none;stroke:var(--accent);stroke-width:2;stroke-dasharray:5 4}
+.hl .halo2{fill:rgba(242,176,30,.25);stroke:var(--gold);stroke-width:3}
+.cnt{font-weight:800;font-size:13px;fill:#fff;pointer-events:none}
+.sidel{font-size:10px;font-weight:700;pointer-events:none}
+.notetext{font-size:14px;pointer-events:none}
+.trail{fill:none;stroke-width:1.6;stroke-dasharray:3 5;opacity:.55;pointer-events:none}
+.box{fill:rgba(217,72,15,.08);stroke:var(--accent);stroke-dasharray:4 4}
+/* modal */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:flex-end;justify-content:center;z-index:50}
+.sheet{background:#fff;width:100%;max-width:460px;border-radius:16px 16px 0 0;padding:16px 14px calc(16px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:10px;max-height:85dvh;overflow:auto}
+@media(min-width:600px){.modal{align-items:center}.sheet{border-radius:16px}}
+.sheet h3{margin:0 0 2px;font-size:16px}
+.sheet .btns{display:flex;gap:8px;justify-content:flex-end}
+.sheet .opt{width:100%;justify-content:flex-start;padding:11px 12px}
+.sheet textarea{min-height:110px;resize:vertical}
+@media(max-width:820px){
+  .main{flex-direction:column}
+  #vid{width:100%;max-width:none;min-width:0;border-right:none;border-bottom:1px solid var(--line);height:36dvh;flex:none}
+  #vid .vctl{padding:6px}
+}
+</style>
+</head>
+<body>
+
+<!-- LIBRARY -->
+<div id="lib">
+  <div class="libhead">
+    <h1 class="grow">Footwork Board</h1>
+    <span id="status1" class="status"></span>
+  </div>
+  <div class="mute small">Salsa On1, On2 and Bachata step maps, filed in folders.</div>
+  <div class="libactions">
+    <button class="primary" id="newCanvas">+ New step map</button>
+    <button id="newFolder">+ New folder</button>
+  </div>
+  <div id="folders"></div>
+</div>
+
+<!-- EDITOR -->
+<div id="ed" class="hidden">
+  <div class="topbar">
+    <button class="ghost" id="back" aria-label="Back">‹ Library</button>
+    <span class="cname" id="cname" title="Rename"></span>
+    <select id="mode" aria-label="Dance mode">
+      <option value="on1">Salsa On1</option>
+      <option value="on2">Salsa On2</option>
+      <option value="bachata">Bachata</option>
+    </select>
+    <button class="toggle" id="tSync" title="Allow syncopated & counts">&amp; Sync</button>
+    <button class="toggle" id="t48" title="Use counts 4 and 8">4 &amp; 8</button>
+    <button id="tVid" title="Show or hide video">🎬 Video</button>
+    <button id="tCounts" title="Edit step counts" class="ghost small">⚙︎</button>
+    <span id="status2" class="status"></span>
+  </div>
+  <div class="main">
+    <div id="vid">
+      <div class="vbox">
+        <video id="video" playsinline controls preload="metadata"></video>
+        <div id="ytwrap" class="hidden"><div id="yt"></div></div>
+        <iframe id="drive" class="hidden" allow="autoplay; fullscreen" allowfullscreen></iframe>
+        <div id="vidEmpty">
+          <div id="vidEmptyText">Load the class clip from your phone to watch it beside the map.</div>
+          <label class="btn" style="background:#eee;color:#111;border-color:#eee">Load video<input type="file" accept="video/*" class="vfile hidden"></label>
+        </div>
+      </div>
+      <div class="vctl">
+        <div class="vrow">
+          <button data-rate="0.5">0.5×</button><button data-rate="0.75">0.75×</button><button data-rate="1" class="on">1×</button>
+          <button id="vMirror" title="Mirror video">⇋ Mirror</button>
+          <button id="vBack" title="Back 2 seconds">↺ 2s</button>
+          <label class="btn">Replace<input type="file" accept="video/*" class="vfile hidden"></label>
+        </div>
+        <div class="vrow">
+          <input id="link" placeholder="Paste YouTube or Google Drive link" inputmode="url">
+          <a class="btn" id="openLink" target="_blank" rel="noopener">Open ↗</a>
+        </div>
+        <div id="vidNote"></div>
+      </div>
+    </div>
+    <div class="stage">
+      <div id="svgwrap">
+        <svg id="floor" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+              <path d="M40 0H0V40" fill="none" stroke="#ebe7df" stroke-width="1"/>
+            </pattern>
+          </defs>
+          <g id="world">
+            <rect x="-6000" y="-6000" width="12000" height="12000" fill="url(#grid)"/>
+            <line x1="-6000" y1="0" x2="6000" y2="0" stroke="#e0dbd2" stroke-width="1.5"/>
+            <line x1="0" y1="-6000" x2="0" y2="6000" stroke="#e0dbd2" stroke-width="1.5"/>
+            <g id="trails"></g>
+            <g id="items"></g>
+            <g id="overlay"></g>
+          </g>
+        </svg>
+        <div class="legend"><span><i style="background:var(--lead)"></i>Lead</span><span><i style="background:var(--follow)"></i>Follow</span><span id="legendMode"></span></div>
+        <div class="hint" id="hint">Tap the floor to place the next step.<br>Drag empty floor to pan, pinch to zoom.</div>
+        <div class="bigcount hidden" id="bigcount"></div>
+      </div>
+      <div class="bottom">
+        <div class="row" id="ctxRow"></div>
+        <div class="row" id="toolRow">
+          <div class="seg">
+            <button data-tool="place" title="Place steps">👣 Step</button>
+            <button data-tool="select" title="Select, box select, move">⬚ Select</button>
+            <button data-tool="note" title="Add text note">✎ Note</button>
+            <button data-tool="pan" title="Pan">✋</button>
+          </div>
+          <span class="sep"></span>
+          <button id="undo" title="Undo">↶</button>
+          <button id="redo" title="Redo">↷</button>
+          <button id="paste" title="Paste copied steps" class="hidden">📋 Paste</button>
+          <span class="sep"></span>
+          <button id="play" title="Play through steps">▶ Play</button>
+          <button id="speed" title="Playback speed">Normal</button>
+          <button id="fit" title="Fit everything in view">⤢ Fit</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="importFile" accept="application/json" class="hidden">
+
+<script>
+(function(){
+"use strict";
+// ---------- helpers ----------
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const NS = 'http://www.w3.org/2000/svg';
+const uidGen = () => Math.random().toString(36).slice(2,9) + Date.now().toString(36).slice(-4);
+const clone = o => JSON.parse(JSON.stringify(o));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+function sv(tag, attrs, parent){
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) if (attrs[k] != null) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+function h(tag, attrs, parent, text){
+  const e = document.createElement(tag);
+  if (attrs) for (const k in attrs){
+    if (k === 'class') e.className = attrs[k];
+    else if (k.startsWith('on')) e.addEventListener(k.slice(2), attrs[k]);
+    else if (attrs[k] != null) e.setAttribute(k, attrs[k]);
+  }
+  if (text != null) e.textContent = text;
+  if (parent) parent.appendChild(e);
+  return e;
+}
+const LEAD = '#2f6fde', FOLLOW = '#e0457b';
+const PALETTE = ['#2f6fde','#e0457b','#1f9d55','#f08c00','#7048e8','#111111','#0c8599','#c92a2a'];
+const ALL = ['1','1&','2','2&','3','3&','4','4&','5','5&','6','6&','7','7&','8','8&'];
+const FOOT = 'M2,-31 C10,-31 14,-22 13,-10 C12,0 9,6 9,14 C9,24 6,31 -1,31 C-8,31 -10,24 -10,14 C-10,4 -13,-4 -12,-14 C-11,-26 -6,-31 2,-31 Z';
+const MODE_NAMES = {on1:'Salsa On1', on2:'Salsa On2', bachata:'Bachata'};
+const DEFAULT_STEPS = {
+  on1: ['1','2','3','5','6','7'],
+  on2: ['1','2','3','5','6','7'],
+  bachata: ['1','2','3','4','5','6','7','8']
+};
+const DEFAULT_BREAKS = {on1:['1','5'], on2:['2','6'], bachata:[]};
+const DEFAULT_TAPS = {on1:[], on2:[], bachata:['4','8']};
+
+// ---------- state ----------
+const S = {
+  lib: {folders:[{id:'unfiled', name:'Unfiled'}], canvases:[]},
+  canvases: {}, loadedFromDb: {}, cur: null,
+  tool: 'place', who: 'lead', side: {lead:'L', follow:'R'}, next: {lead:null, follow:null},
+  sel: new Set(), hl: new Set(), view: {tx:0, ty:0, s:1},
+  undo: [], redo: [], clip: null,
+  coll: null, assets: null, store: 'local',
+  open: {}, sessionVideos: {}, playing: null, speed: 1, showVid: true
+};
+try { S.open = JSON.parse(localStorage.getItem('fwb1:open')) || {}; } catch(e){}
+
+// ---------- local cache ----------
+function lsGet(k){ try { return JSON.parse(localStorage.getItem('fwb1:' + k)); } catch(e){ return null; } }
+function lsSet(k, v){ try { localStorage.setItem('fwb1:' + k, JSON.stringify(v)); } catch(e){} }
+function lsDel(k){ try { localStorage.removeItem('fwb1:' + k); } catch(e){} }
+
+function normalizeLib(l){
+  l = l && typeof l === 'object' ? l : {};
+  l.folders = Array.isArray(l.folders) ? l.folders : [];
+  if (!l.folders.find(f => f.id === 'unfiled')) l.folders.unshift({id:'unfiled', name:'Unfiled'});
+  l.canvases = Array.isArray(l.canvases) ? l.canvases : [];
+  l.canvases.forEach(m => { if (!l.folders.find(f => f.id === m.folderId)) m.folderId = 'unfiled'; });
+  return l;
+}
+S.lib = normalizeLib(lsGet('lib'));
+
+// ---------- status ----------
+let statusText = '';
+function setStatus(kind){
+  const map = {
+    local: ['Saved on this device', ''], saving: ['Saving…',''], saved: ['Saved',''],
+    slow: ['Can’t reach storage yet', 'warn'], error: ['Not saved, retrying on next change', 'warn'], loading:['Loading…','']
+  };
+  const [t, c] = map[kind] || ['', ''];
+  statusText = t;
+  ['#status1', '#status2'].forEach(id => { const e = $(id); e.textContent = t; e.className = 'status ' + c; });
+}
+
+// ---------- cloud ----------
+const wq = {};
+function writeDoc(docId, data){
+  data = clone(data);
+  lsSet(docId, data);
+  if (!S.coll){ setStatus('local'); return; }
+  const q = wq[docId] || (wq[docId] = {busy:false, pending:null});
+  q.pending = data;
+  if (!q.busy) flush(docId);
+}
+async function flush(docId){
+  const q = wq[docId]; q.busy = true;
+  while (q.pending){
+    const d = q.pending; q.pending = null;
+    setStatus('saving');
+    try { await S.coll.doc(docId).set(d); }
+    catch(e){
+      if (e && e.code === 'unavailable'){
+        await sleep(700 + Math.random() * 900);
+        try { await S.coll.doc(docId).set(d); } catch(e2){ setStatus('error'); }
+      } else if (e && e.code === 'quota_exceeded'){ setStatus('error'); note('Storage is full. Delete some old step maps.'); }
+      else setStatus('error');
+    }
+  }
+  q.busy = false;
+  if (!Object.values(wq).some(x => x.busy) && statusText === 'Saving…') setStatus('saved');
+}
+function deleteDoc(docId){
+  lsDel(docId);
+  if (S.coll) S.coll.doc(docId).delete().catch(()=>{});
+}
+function saveLib(){ writeDoc('lib', S.lib); }
+
+let saveT = null;
+function saveCanvasSoon(){
+  const c = S.cur; if (!c) return;
+  clearTimeout(saveT);
+  saveT = setTimeout(() => {
+    c.updated = Date.now();
+    S.canvases[c.id] = c;
+    const m = S.lib.canvases.find(x => x.id === c.id);
+    if (m){ m.updated = c.updated; m.mode = c.mode; m.name = c.name; }
+    writeDoc('c-' + c.id, c);
+    saveLib();
+  }, 600);
+}
+
+async function connect(){
+  setStatus('local');
+  if (!window.claude || typeof window.claude.use !== 'function') return;
+  let db = null, user = null;
+  try { [db, user] = await Promise.all([window.claude.use('db'), window.claude.use('user')]); } catch(e){}
+  try { S.assets = await window.claude.use('assets'); } catch(e){ S.assets = null; }
+  updateVidNote();
+  if (!db || !user) return;
+  let id = null;
+  try { id = await user.id(); } catch(e){}
+  if (!id) return;
+  const coll = db.collection('data/users/' + id);
+  setStatus('loading');
+  const timer = setTimeout(() => setStatus('slow'), 10000);
+  try {
+    const snap = await coll.doc('lib').get();
+    clearTimeout(timer);
+    S.coll = coll;
+    if (snap.exists){
+      S.lib = normalizeLib(clone(snap.data()));
+      lsSet('lib', S.lib);
+    } else if (S.lib.canvases.length){
+      saveLib();
+      for (const m of S.lib.canvases){ const c = lsGet('c-' + m.id); if (c) writeDoc('c-' + m.id, c); }
+    }
+    setStatus('saved');
+    if (!S.cur) renderLib();
+  } catch(e){
+    clearTimeout(timer);
+    setStatus('local');
+  }
+}
+
+// ---------- modals ----------
+function modal(build){
+  return new Promise(resolve => {
+    const m = h('div', {class:'modal'}, document.body);
+    const sh = h('div', {class:'sheet'}, m);
+    const close = v => { m.remove(); resolve(v); };
+    m.addEventListener('pointerdown', e => { if (e.target === m) close(null); });
+    build(sh, close);
+  });
+}
+function ask(title, value, opts){
+  opts = opts || {};
+  return modal((sh, close) => {
+    h('h3', null, sh, title);
+    const inp = h(opts.multiline ? 'textarea' : 'input', {placeholder: opts.placeholder || ''}, sh);
+    inp.value = value || '';
+    const b = h('div', {class:'btns'}, sh);
+    h('button', {onclick: () => close(null)}, b, 'Cancel');
+    h('button', {class:'primary', onclick: () => close(inp.value.trim())}, b, opts.ok || 'Save');
+    if (!opts.multiline) inp.addEventListener('keydown', e => { if (e.key === 'Enter') close(inp.value.trim()); });
+    setTimeout(() => { inp.focus(); if (inp.select && !opts.multiline) inp.select(); }, 50);
+  });
+}
+function confirmBox(title, text, ok){
+  return modal((sh, close) => {
+    h('h3', null, sh, title);
+    if (text) h('div', {class:'mute'}, sh, text);
+    const b = h('div', {class:'btns'}, sh);
+    h('button', {onclick: () => close(false)}, b, 'Cancel');
+    h('button', {class:'primary', onclick: () => close(true)}, b, ok || 'OK');
+  });
+}
+function sheet(title, options){
+  return modal((sh, close) => {
+    h('h3', null, sh, title);
+    options.forEach(o => {
+      h('button', {class:'opt ' + (o.danger ? 'danger' : ''), onclick: () => { close(null); o.fn(); }}, sh, o.label);
+    });
+    h('button', {class:'opt ghost', onclick: () => close(null)}, sh, 'Cancel');
+  });
+}
+
+// ---------- library ----------
+function fmtDate(t){
+  if (!t) return '';
+  const d = new Date(t);
+  return d.toLocaleDateString(undefined, {day:'numeric', month:'short'});
+}
+function renderLib(){
+  const wrap = $('#folders'); wrap.innerHTML = '';
+  S.lib.folders.forEach((f, fi) => {
+    const items = S.lib.canvases.filter(c => c.folderId === f.id).sort((a,b) => (b.updated||0) - (a.updated||0));
+    const isOpen = S.open[f.id] !== false;
+    const box = h('div', {class:'folder' + (isOpen ? ' open' : '')}, wrap);
+    const head = h('div', {class:'fhead'}, box);
+    h('span', {class:'caret'}, head, '▶');
+    h('span', {class:'name'}, head, '📁 ' + f.name);
+    h('span', {class:'badge'}, head, String(items.length));
+    head.addEventListener('click', e => {
+      if (e.target.closest('button')) return;
+      S.open[f.id] = !isOpen;
+      try { localStorage.setItem('fwb1:open', JSON.stringify(S.open)); } catch(err){}
+      renderLib();
+    });
+    h('button', {class:'ghost', title:'New step map here', onclick: () => newCanvas(f.id)}, head, '+');
+    h('button', {class:'ghost', title:'Folder options', onclick: () => folderMenu(f, fi)}, head, '⋯');
+    const list = h('div', {class:'flist'}, box);
+    if (!items.length) h('div', {class:'empty'}, list, 'No step maps yet.');
+    items.forEach(m => {
+      const card = h('div', {class:'card'}, list);
+      card.addEventListener('click', e => { if (!e.target.closest('button')) openCanvas(m.id); });
+      h('span', null, card, '👣');
+      const t = h('div', {class:'t'}, card);
+      h('b', null, t, m.name);
+      h('span', {class:'mute small'}, t, fmtDate(m.updated));
+      h('span', {class:'badge'}, card, MODE_NAMES[m.mode] || 'Salsa On1');
+      h('button', {class:'ghost', onclick: () => canvasMenu(m)}, card, '⋯');
+    });
+  });
+  const foot = h('div', {class:'libactions'}, wrap);
+  h('button', {class:'ghost small', onclick: exportAll}, foot, 'Copy backup');
+  h('button', {class:'ghost small', onclick: importAll}, foot, 'Restore backup');
+}
+
+function folderMenu(f, fi){
+  const opts = [
+    {label:'Rename', fn: async () => { const n = await ask('Rename folder', f.name); if (n){ f.name = n; saveLib(); renderLib(); } }},
+  ];
+  if (fi > 0) opts.push({label:'Move up', fn: () => { const a = S.lib.folders; [a[fi-1], a[fi]] = [a[fi], a[fi-1]]; saveLib(); renderLib(); }});
+  if (fi < S.lib.folders.length - 1) opts.push({label:'Move down', fn: () => { const a = S.lib.folders; [a[fi+1], a[fi]] = [a[fi], a[fi+1]]; saveLib(); renderLib(); }});
+  if (f.id !== 'unfiled') opts.push({label:'Delete folder', danger:true, fn: async () => {
+    const n = S.lib.canvases.filter(c => c.folderId === f.id).length;
+    const ok = await confirmBox('Delete "' + f.name + '"?', n ? n + ' step map(s) inside will move to Unfiled.' : '', 'Delete');
+    if (!ok) return;
+    S.lib.canvases.forEach(c => { if (c.folderId === f.id) c.folderId = 'unfiled'; });
+    S.lib.folders = S.lib.folders.filter(x => x !== f);
+    saveLib(); renderLib();
+  }});
+  sheet(f.name, opts);
+}
+function canvasMenu(m){
+  sheet(m.name, [
+    {label:'Open', fn: () => openCanvas(m.id)},
+    {label:'Rename', fn: async () => { const n = await ask('Rename step map', m.name); if (n) renameCanvas(m.id, n); }},
+    {label:'Move to folder', fn: () => moveMenu(m)},
+    {label:'Duplicate', fn: async () => {
+      const src = await loadCanvas(m.id);
+      const c = clone(src); c.id = uidGen(); c.name = m.name + ' copy'; c.updated = Date.now();
+      S.canvases[c.id] = c;
+      S.lib.canvases.push({id:c.id, name:c.name, folderId:m.folderId, mode:c.mode, updated:c.updated});
+      writeDoc('c-' + c.id, c); saveLib(); renderLib();
+    }},
+    {label:'Delete', danger:true, fn: async () => {
+      if (!(await confirmBox('Delete "' + m.name + '"?', 'This can’t be undone.', 'Delete'))) return;
+      S.lib.canvases = S.lib.canvases.filter(x => x.id !== m.id);
+      delete S.canvases[m.id];
+      deleteDoc('c-' + m.id); saveLib(); renderLib();
+    }}
+  ]);
+}
+function moveMenu(m){
+  sheet('Move "' + m.name + '" to', S.lib.folders.map(f => ({
+    label: (f.id === m.folderId ? '✓ ' : '') + f.name,
+    fn: () => { m.folderId = f.id; saveLib(); renderLib(); }
+  })).concat([{label:'+ New folder…', fn: async () => {
+    const n = await ask('New folder', '', {placeholder:'e.g. Tuesday class, Shines, Turn patterns'});
+    if (!n) return;
+    const f = {id: uidGen(), name: n}; S.lib.folders.push(f); m.folderId = f.id; saveLib(); renderLib();
+  }}]));
+}
+function renameCanvas(id, name){
+  const m = S.lib.canvases.find(x => x.id === id); if (m) m.name = name;
+  const c = S.canvases[id];
+  if (c){ c.name = name; if (S.cur === c){ $('#cname').textContent = name; saveCanvasSoon(); } else writeDoc('c-' + id, c); }
+  saveLib(); if (!S.cur) renderLib();
+}
+function blankCanvas(id, name, folderId, mode){
+  return {id, name, folderId, mode: mode || 'on1', sync:false, use48:false, steps:null, link:'', videoId:null, videoName:'', items:[], updated:Date.now()};
+}
+async function newCanvas(folderId){
+  const name = await ask('New step map', '', {placeholder:'e.g. Cross body lead with inside turn', ok:'Create'});
+  if (name === null) return;
+  const id = uidGen();
+  const last = S.lib.canvases.slice().sort((a,b)=>(b.updated||0)-(a.updated||0))[0];
+  const c = blankCanvas(id, name || 'Untitled', folderId || 'unfiled', last ? last.mode : 'on1');
+  S.canvases[id] = c;
+  S.lib.canvases.push({id, name:c.name, folderId:c.folderId, mode:c.mode, updated:c.updated});
+  S.open[c.folderId] = true;
+  writeDoc('c-' + id, c); saveLib();
+  openCanvas(id);
+}
+$('#newCanvas').onclick = () => newCanvas('unfiled');
+$('#newFolder').onclick = async () => {
+  const n = await ask('New folder', '', {placeholder:'e.g. Tuesday class, Shines, Turn patterns', ok:'Create'});
+  if (!n) return;
+  S.lib.folders.push({id: uidGen(), name: n}); saveLib(); renderLib();
+};
+
+async function exportAll(){
+  const all = {lib: S.lib, canvases: {}};
+  for (const m of S.lib.canvases){ all.canvases[m.id] = await loadCanvas(m.id); }
+  const txt = JSON.stringify(all);
+  try { await navigator.clipboard.writeText(txt); note('Backup copied. Paste it into a note to keep it.', true); }
+  catch(e){
+    modal((sh, close) => { h('h3', null, sh, 'Backup'); h('div', {class:'mute small'}, sh, 'Select all and copy this text.'); const t = h('textarea', null, sh); t.value = txt; h('button', {onclick: () => close()}, sh, 'Done'); });
+  }
+}
+async function importAll(){
+  const txt = await ask('Restore backup', '', {multiline:true, placeholder:'Paste backup text', ok:'Restore'});
+  if (!txt) return;
+  try {
+    const all = JSON.parse(txt);
+    const lib = normalizeLib(all.lib);
+    lib.folders.forEach(f => { if (!S.lib.folders.find(x => x.id === f.id)) S.lib.folders.push(f); });
+    lib.canvases.forEach(m => {
+      const c = all.canvases && all.canvases[m.id]; if (!c) return;
+      if (!S.lib.canvases.find(x => x.id === m.id)) S.lib.canvases.push(m);
+      S.canvases[m.id] = c; writeDoc('c-' + m.id, c);
+    });
+    saveLib(); renderLib();
+  } catch(e){ confirmBox('That backup text could not be read.', '', 'OK'); }
+}
+
+// ---------- canvas load ----------
+async function loadCanvas(id){
+  let c = S.canvases[id] || lsGet('c-' + id);
+  if (S.coll && !S.loadedFromDb[id]){
+    try {
+      const s = await S.coll.doc('c-' + id).get();
+      if (s.exists){ const d = clone(s.data()); if (!c || (d.updated || 0) >= (c.updated || 0)) c = d; }
+      S.loadedFromDb[id] = true;
+    } catch(e){}
+  }
+  if (!c){
+    const m = S.lib.canvases.find(x => x.id === id) || {};
+    c = blankCanvas(id, m.name || 'Untitled', m.folderId || 'unfiled', m.mode);
+  }
+  c.items = Array.isArray(c.items) ? c.items : [];
+  S.canvases[id] = c;
+  return c;
+}
+async function openCanvas(id){
+  setStatus('loading');
+  const c = await loadCanvas(id);
+  setStatus(S.coll ? 'saved' : 'local');
+  S.cur = c; S.sel.clear(); S.hl.clear(); S.undo = []; S.redo = [];
+  S.next = {lead:null, follow:null};
+  S.side = {lead: oppositeOfLast('lead', 'L'), follow: oppositeOfLast('follow', 'R')};
+  S.who = 'lead';
+  S.showVid = window.innerWidth > 820 || !!(c.videoId || c.link || S.sessionVideos[c.id]);
+  $('#lib').classList.add('hidden'); $('#ed').classList.remove('hidden');
+  $('#cname').textContent = c.name;
+  setupVideo();
+  syncTop();
+  requestAnimationFrame(() => { fitView(); render(); });
+  try { history.replaceState(null, '', '#' + 'map-' + id.replace(/[^a-z0-9-]/gi,'')); } catch(e){}
+}
+function closeCanvas(){
+  stopPlay();
+  if (S.cur){ clearTimeout(saveT); const c = S.cur; c.updated = Date.now(); const m = S.lib.canvases.find(x => x.id === c.id); if (m){ m.updated = c.updated; m.mode = c.mode; } writeDoc('c-' + c.id, c); saveLib(); }
+  S.cur = null;
+  const v = $('#video'); v.pause(); if (ytCall('pauseVideo')) try { ytPlayer.pauseVideo(); } catch(e){}
+  $('#ed').classList.add('hidden'); $('#lib').classList.remove('hidden');
+  renderLib();
+  try { history.replaceState(null, '', location.pathname + location.search); } catch(e){}
+}
+$('#back').onclick = closeCanvas;
+$('#cname').onclick = async () => { const n = await ask('Rename step map', S.cur.name); if (n) renameCanvas(S.cur.id, n); };
+
+// ---------- counts ----------
+function modeInfo(c){
+  let steps = (c.steps && c.steps[c.mode]) ? c.steps[c.mode].slice() : DEFAULT_STEPS[c.mode].slice();
+  if (c.mode !== 'bachata' && c.use48){ ['4','8'].forEach(x => { if (!steps.includes(x)) steps.push(x); }); }
+  steps.sort((a,b) => ALL.indexOf(a) - ALL.indexOf(b));
+  return {steps, breaks: DEFAULT_BREAKS[c.mode], taps: DEFAULT_TAPS[c.mode]};
+}
+function chipCounts(c){
+  const m = modeInfo(c);
+  return ALL.filter(x => m.steps.includes(x) || (c.sync && x.endsWith('&')));
+}
+function autoNext(c, cur){
+  const m = modeInfo(c);
+  let i = ALL.indexOf(cur);
+  for (let k = 1; k <= ALL.length; k++){
+    const x = ALL[(i + k + ALL.length) % ALL.length];
+    if (m.steps.includes(x)) return x;
+  }
+  return m.steps[0] || '1';
+}
+function feetOf(who){ return S.cur.items.filter(it => it.type === 'foot' && it.who === who); }
+function lastFoot(who){ const f = feetOf(who); return f[f.length - 1]; }
+function oppositeOfLast(who, dflt){ const l = S.cur && lastFoot(who); return l ? (l.side === 'L' ? 'R' : 'L') : dflt; }
+function getNext(who){
+  const c = S.cur, allowed = chipCounts(c);
+  if (S.next[who] && allowed.includes(S.next[who])) return S.next[who];
+  const l = lastFoot(who);
+  return l ? autoNext(c, l.count) : (modeInfo(c).steps[0] || '1');
+}
+
+// ---------- top bar ----------
+function syncTop(){
+  const c = S.cur;
+  $('#mode').value = c.mode;
+  $('#tSync').classList.toggle('on', !!c.sync);
+  $('#t48').classList.toggle('on', !!c.use48);
+  $('#t48').classList.toggle('hidden', c.mode === 'bachata');
+  $('#tVid').classList.toggle('on', S.showVid);
+  $('#vid').classList.toggle('hidden', !S.showVid);
+  const m = modeInfo(c);
+  $('#legendMode').textContent = MODE_NAMES[c.mode] + (m.breaks.length ? ' · breaks on ' + m.breaks.join(' & ') : ' · taps on 4 & 8');
+}
+$('#mode').onchange = e => { pushUndo(); S.cur.mode = e.target.value; S.next = {lead:null, follow:null}; syncTop(); render(); saveCanvasSoon(); };
+$('#tSync').onclick = () => { S.cur.sync = !S.cur.sync; syncTop(); renderCtx(); saveCanvasSoon(); };
+$('#t48').onclick = () => { S.cur.use48 = !S.cur.use48; S.next = {lead:null, follow:null}; syncTop(); renderCtx(); saveCanvasSoon(); };
+$('#tVid').onclick = () => { S.showVid = !S.showVid; syncTop(); requestAnimationFrame(render); };
+$('#tCounts').onclick = async () => {
+  const c = S.cur;
+  const v = await ask('Step counts for ' + MODE_NAMES[c.mode], ((c.steps && c.steps[c.mode]) || DEFAULT_STEPS[c.mode]).join(' '), {placeholder:'e.g. 1 2 3 5 6 7', ok:'Save'});
+  if (v === null) return;
+  const list = v.split(/[\s,]+/).filter(x => ALL.includes(x));
+  c.steps = c.steps || {};
+  if (list.length) c.steps[c.mode] = list; else delete c.steps[c.mode];
+  S.next = {lead:null, follow:null};
+  renderCtx(); saveCanvasSoon();
+};
+
+// ---------- view ----------
+const svg = $('#floor'), world = $('#world');
+function applyView(){ const v = S.view; world.setAttribute('transform', `translate(${v.tx} ${v.ty}) scale(${v.s})`); }
+function toWorld(cx, cy){ const r = svg.getBoundingClientRect(); return {x:(cx - r.left - S.view.tx) / S.view.s, y:(cy - r.top - S.view.ty) / S.view.s}; }
+function fitView(){
+  const r = svg.getBoundingClientRect();
+  const its = S.cur ? S.cur.items : [];
+  let x0=-160, y0=-160, x1=160, y1=160;
+  if (its.length){
+    x0 = Math.min(...its.map(i => i.x)) - 70; x1 = Math.max(...its.map(i => i.x + (i.type === 'note' ? 160 : 0))) + 70;
+    y0 = Math.min(...its.map(i => i.y)) - 70; y1 = Math.max(...its.map(i => i.y)) + 70;
+  }
+  const s = Math.max(0.25, Math.min(2.2, Math.min(r.width / (x1 - x0), r.height / (y1 - y0))));
+  S.view = {s, tx: r.width / 2 - s * (x0 + x1) / 2, ty: r.height / 2 - s * (y0 + y1) / 2};
+  applyView();
+}
+$('#fit').onclick = () => { fitView(); render(); };
+
+// ---------- render ----------
+function render(){
+  if (!S.cur) return;
+  applyView();
+  const c = S.cur, m = modeInfo(c);
+  const itemsG = $('#items'), trails = $('#trails'), ov = $('#overlay');
+  itemsG.innerHTML = ''; trails.innerHTML = ''; ov.innerHTML = '';
+  ['lead','follow'].forEach(who => {
+    const f = feetOf(who); if (f.length < 2) return;
+    const col = who === 'lead' ? LEAD : FOLLOW;
+    sv('path', {class:'trail', stroke: col, d: 'M' + f.map(p => p.x.toFixed(1) + ' ' + p.y.toFixed(1)).join(' L')}, trails);
+  });
+  c.items.forEach(it => {
+    const sel = S.sel.has(it.id), hl = S.hl.has(it.id);
+    if (it.type === 'foot'){
+      const col = it.color || (it.who === 'lead' ? LEAD : FOLLOW);
+      const tap = m.taps.includes(it.count), brk = m.breaks.includes(it.count);
+      const g = sv('g', {'data-id': it.id, class:'item' + (hl ? ' hl' : ''), transform:`translate(${it.x} ${it.y}) rotate(${it.rot || 0})`}, itemsG);
+      if (hl) sv('circle', {r:42, class:'halo2'}, g);
+      sv('circle', {r:36, fill:'transparent'}, g);
+      const inner = sv('g', {transform: it.side === 'R' ? 'scale(-1,1)' : null}, g);
+      sv('path', {d:FOOT, fill:col, 'fill-opacity': tap ? 0.06 : 0.22, stroke:col, 'stroke-width':2.5, 'stroke-dasharray': tap ? '5 4' : null}, inner);
+      sv('circle', {cx:0, cy:-22, r:3, fill:col, opacity:.7}, inner);
+      if (sel) sv('circle', {r:40, class:'halo'}, g);
+      const badge = sv('g', {transform:`rotate(${-(it.rot || 0)})`}, g);
+      const label = it.count.replace('&', '+');
+      sv('circle', {r: label.length > 1 ? 15 : 13, fill:col, stroke: brk ? '#f2b01e' : '#fff', 'stroke-width': brk ? 4 : 2}, badge);
+      const t = sv('text', {y:4.6, 'text-anchor':'middle', class:'cnt'}, badge); t.textContent = it.count;
+      const sideG = sv('g', {transform:`translate(0 24) rotate(${-(it.rot || 0)})`}, g);
+      const st = sv('text', {y:3.5, 'text-anchor':'middle', class:'sidel', fill:col}, sideG); st.textContent = it.side;
+      if (sel && S.sel.size === 1){
+        sv('line', {x1:0, y1:-36, x2:0, y2:-58, stroke:'#d9480f', 'stroke-width':2}, g);
+        const hr = Math.max(9, 13 / S.view.s);
+        sv('circle', {cx:0, cy:-58 - hr / 2, r:hr, fill:'#fff', stroke:'#d9480f', 'stroke-width':2.5, 'data-handle':'rot', class:'item'}, g);
+        const ar = sv('text', {x:0, y:-58 - hr / 2 + 4.5, 'text-anchor':'middle', 'font-size':13, fill:'#d9480f', 'pointer-events':'none'}, g); ar.textContent = '⟳';
+      }
+    } else if (it.type === 'note'){
+      const lines = String(it.text || '').split('\n');
+      const w = Math.max(40, Math.min(360, Math.max(...lines.map(l => l.length)) * 7.6 + 18));
+      const hgt = lines.length * 18 + 12;
+      const col = it.color || '#111111';
+      const g = sv('g', {'data-id': it.id, class:'item', transform:`translate(${it.x} ${it.y})`}, itemsG);
+      sv('rect', {x:0, y:0, width:w, height:hgt, rx:8, fill:'#fffdf5', stroke: sel ? '#d9480f' : col, 'stroke-width': sel ? 2.5 : 1.2, 'stroke-dasharray': sel ? '5 4' : null}, g);
+      lines.forEach((l, i) => { const t = sv('text', {x:9, y:20 + i * 18, class:'notetext', fill:col}, g); t.textContent = l; });
+    }
+  });
+  if (box){
+    const x = Math.min(box.a.x, box.b.x), y = Math.min(box.a.y, box.b.y);
+    sv('rect', {class:'box', x, y, width:Math.abs(box.a.x - box.b.x), height:Math.abs(box.a.y - box.b.y)}, ov);
+  }
+  $('#hint').classList.toggle('hidden', c.items.length > 0);
+  $('#hint').innerHTML = S.tool === 'note' ? 'Tap the floor to add a note.' : 'Tap the floor to place the next step.<br>Drag empty floor to pan, pinch to zoom.';
+  renderCtx();
+  renderTools();
+}
+
+function renderTools(){
+  $$('[data-tool]').forEach(b => b.classList.toggle('on', b.dataset.tool === S.tool));
+  $('#undo').disabled = !S.undo.length; $('#redo').disabled = !S.redo.length;
+  $('#paste').classList.toggle('hidden', !S.clip);
+  $('#play').textContent = S.playing ? '■ Stop' : '▶ Play';
+  $('#speed').textContent = ['Slow','Normal','Fast'][S.speed];
+}
+
+let ctxKey = '';
+function renderCtx(){
+  const row = $('#ctxRow'), c = S.cur; if (!c) return;
+  const selItems = c.items.filter(i => S.sel.has(i.id));
+  row.innerHTML = '';
+  if (selItems.length){
+    const feet = selItems.filter(i => i.type === 'foot');
+    if (selItems.length === 1 && feet.length === 1){
+      const f = feet[0];
+      h('span', {class:'lbl'}, row, 'Count');
+      chipCounts(c).forEach(x => {
+        const col = f.color || (f.who === 'lead' ? LEAD : FOLLOW);
+        const b = h('button', {class:'chip' + (x.includes('&') ? ' amp' : '') + (f.count === x ? ' on' : ''), style: f.count === x ? 'background:' + col + ';border-color:' + col : null, onclick: () => { pushUndo(); f.count = x; changed(); }}, row, x);
+      });
+      h('span', {class:'sep'}, row);
+    }
+    h('button', {title:'Rotate left', onclick: () => rotateSel(-15)}, row, '⟲');
+    h('button', {title:'Rotate right', onclick: () => rotateSel(15)}, row, '⟳');
+    if (feet.length) h('button', {title:'Switch left/right foot', onclick: () => { pushUndo(); feet.forEach(f => f.side = f.side === 'L' ? 'R' : 'L'); changed(); }}, row, 'L⇄R');
+    if (feet.length) h('button', {title:'Switch lead/follow', onclick: () => { pushUndo(); feet.forEach(f => f.who = f.who === 'lead' ? 'follow' : 'lead'); changed(); }}, row, 'Lead⇄Follow');
+    if (selItems.length > 1) h('button', {title:'Mirror the selection', onclick: mirrorSel}, row, '⇋ Mirror');
+    h('span', {class:'sep'}, row);
+    PALETTE.forEach(col => h('button', {class:'sw', style:'background:' + col, title:'Colour', onclick: () => { pushUndo(); selItems.forEach(i => i.color = col); changed(); }}, row));
+    h('button', {class:'small', title:'Default colours', onclick: () => { pushUndo(); selItems.forEach(i => i.color = null); changed(); }}, row, 'Auto');
+    h('span', {class:'sep'}, row);
+    if (selItems.length === 1 && selItems[0].type === 'note') h('button', {onclick: () => editNote(selItems[0])}, row, '✎ Edit');
+    h('button', {onclick: duplicateSel}, row, '⧉ Duplicate');
+    h('button', {onclick: copySel}, row, 'Copy');
+    h('button', {class:'danger', onclick: deleteSel}, row, '🗑');
+    h('button', {class:'ghost', onclick: () => { S.sel.clear(); render(); }}, row, 'Done');
+    return;
+  }
+  if (S.tool === 'place'){
+    const seg = h('div', {class:'seg'}, row);
+    ['lead','follow'].forEach(w => {
+      const b = h('button', {class: S.who === w ? 'on' : '', onclick: () => { S.who = w; renderCtx(); }}, seg, w === 'lead' ? 'Lead' : 'Follow');
+      if (S.who === w){ b.style.background = w === 'lead' ? LEAD : FOLLOW; b.style.borderColor = b.style.background; }
+    });
+    const seg2 = h('div', {class:'seg'}, row);
+    ['L','R'].forEach(sd => h('button', {class: S.side[S.who] === sd ? 'on' : '', onclick: () => { S.side[S.who] = sd; renderCtx(); }}, seg2, sd));
+    h('span', {class:'lbl'}, row, 'Next');
+    const nx = getNext(S.who), col = S.who === 'lead' ? LEAD : FOLLOW;
+    chipCounts(c).forEach(x => {
+      h('button', {class:'chip' + (x.includes('&') ? ' amp' : '') + (nx === x ? ' on' : ''), style: nx === x ? 'background:' + col + ';border-color:' + col : null, onclick: () => { S.next[S.who] = x; renderCtx(); }}, row, x);
+    });
+  } else if (S.tool === 'select'){
+    h('span', {class:'mute small', style:'padding:6px 2px'}, row, 'Tap a step to select it. Drag across empty floor to box-select a section, then drag it anywhere.');
+    if (c.items.length) h('button', {onclick: () => { c.items.forEach(i => S.sel.add(i.id)); render(); }}, row, 'Select all');
+  } else if (S.tool === 'note'){
+    h('span', {class:'mute small', style:'padding:6px 2px'}, row, 'Tap the floor to add a note. Tap a note to edit it.');
+  } else {
+    h('span', {class:'mute small', style:'padding:6px 2px'}, row, 'Drag to move around. Pinch or scroll to zoom.');
+  }
+}
+
+$$('[data-tool]').forEach(b => b.onclick = () => { S.tool = b.dataset.tool; S.sel.clear(); render(); });
+
+// ---------- edits ----------
+function snapshot(){ return JSON.stringify(S.cur.items); }
+function pushUndo(){ S.undo.push(snapshot()); if (S.undo.length > 80) S.undo.shift(); S.redo = []; }
+function changed(){ render(); saveCanvasSoon(); }
+$('#undo').onclick = () => { if (!S.undo.length) return; S.redo.push(snapshot()); S.cur.items = JSON.parse(S.undo.pop()); pruneSel(); S.next = {lead:null, follow:null}; changed(); };
+$('#redo').onclick = () => { if (!S.redo.length) return; S.undo.push(snapshot()); S.cur.items = JSON.parse(S.redo.pop()); pruneSel(); changed(); };
+function pruneSel(){ const ids = new Set(S.cur.items.map(i => i.id)); [...S.sel].forEach(id => { if (!ids.has(id)) S.sel.delete(id); }); }
+
+function placeFoot(x, y){
+  pushUndo();
+  const c = S.cur, who = S.who, count = getNext(who), side = S.side[who];
+  const last = lastFoot(who);
+  const rot = last ? (last.rot || 0) : (who === 'follow' ? 180 : 0);
+  c.items.push({id: uidGen(), type:'foot', who, side, x: Math.round(x), y: Math.round(y), rot, count, color: last ? last.color : null});
+  S.side[who] = side === 'L' ? 'R' : 'L';
+  S.next[who] = autoNext(c, count);
+  changed();
+}
+async function addNote(x, y){
+  const t = await ask('Note', '', {multiline:true, placeholder:'e.g. Hand check on 5, keep frame', ok:'Add'});
+  if (!t) return;
+  pushUndo();
+  S.cur.items.push({id: uidGen(), type:'note', x: Math.round(x), y: Math.round(y), text: t, color: null});
+  changed();
+}
+async function editNote(it){
+  const t = await ask('Edit note', it.text, {multiline:true});
+  if (t === null) return;
+  pushUndo();
+  if (!t) S.cur.items = S.cur.items.filter(i => i !== it), S.sel.delete(it.id); else it.text = t;
+  changed();
+}
+function selItems(){ return S.cur.items.filter(i => S.sel.has(i.id)); }
+function centroid(arr){ return {x: arr.reduce((a,i) => a + i.x, 0) / arr.length, y: arr.reduce((a,i) => a + i.y, 0) / arr.length}; }
+function rotateSel(deg){
+  const arr = selItems(); if (!arr.length) return;
+  pushUndo();
+  if (arr.length > 1){
+    const c = centroid(arr), r = deg * Math.PI / 180, cs = Math.cos(r), sn = Math.sin(r);
+    arr.forEach(i => { const dx = i.x - c.x, dy = i.y - c.y; i.x = Math.round(c.x + dx * cs - dy * sn); i.y = Math.round(c.y + dx * sn + dy * cs); });
+  }
+  arr.forEach(i => { if (i.type === 'foot') i.rot = ((i.rot || 0) + deg + 360) % 360; });
+  changed();
+}
+function mirrorSel(){
+  const arr = selItems(); if (!arr.length) return;
+  pushUndo();
+  const c = centroid(arr);
+  arr.forEach(i => { i.x = Math.round(2 * c.x - i.x); if (i.type === 'foot'){ i.rot = (360 - (i.rot || 0)) % 360; i.side = i.side === 'L' ? 'R' : 'L'; } });
+  changed();
+}
+function cloneItems(arr, dx, dy){
+  return arr.map(i => Object.assign(clone(i), {id: uidGen(), x: i.x + dx, y: i.y + dy}));
+}
+function duplicateSel(){
+  const arr = selItems(); if (!arr.length) return;
+  pushUndo();
+  const copies = cloneItems(arr, 60, 60);
+  S.cur.items.push(...copies);
+  S.sel = new Set(copies.map(i => i.id));
+  if (S.tool === 'place') S.tool = 'select';
+  note('Copy placed. Drag it where you want it.', true);
+  changed();
+}
+function copySel(){
+  const arr = selItems(); if (!arr.length) return;
+  S.clip = clone(arr);
+  try { sessionStorage.setItem('fwb1:clip', JSON.stringify(S.clip)); } catch(e){}
+  note(arr.length + ' item(s) copied. Paste into any step map.', true);
+  renderTools();
+}
+try { S.clip = JSON.parse(sessionStorage.getItem('fwb1:clip')); } catch(e){}
+$('#paste').onclick = () => {
+  if (!S.clip || !S.clip.length) return;
+  pushUndo();
+  const r = svg.getBoundingClientRect();
+  const center = toWorld(r.left + r.width / 2, r.top + r.height / 2);
+  const c = centroid(S.clip);
+  const copies = cloneItems(S.clip, Math.round(center.x - c.x), Math.round(center.y - c.y));
+  S.cur.items.push(...copies);
+  S.sel = new Set(copies.map(i => i.id));
+  S.tool = 'select';
+  changed();
+};
+function deleteSel(){
+  if (!S.sel.size) return;
+  pushUndo();
+  S.cur.items = S.cur.items.filter(i => !S.sel.has(i.id));
+  S.sel.clear(); S.next = {lead:null, follow:null};
+  changed();
+}
+
+// ---------- pointer gestures ----------
+const ptrs = new Map();
+let gesture = null, box = null;
+function localPt(cx, cy){ const r = svg.getBoundingClientRect(); return {x: cx - r.left, y: cy - r.top}; }
+svg.addEventListener('pointerdown', e => {
+  if (!S.cur) return;
+  stopPlay();
+  try { svg.setPointerCapture(e.pointerId); } catch(err){}
+  ptrs.set(e.pointerId, {x: e.clientX, y: e.clientY});
+  if (ptrs.size === 2){
+    const [a, b] = [...ptrs.values()];
+    const mid = localPt((a.x + b.x) / 2, (a.y + b.y) / 2);
+    gesture = {type:'pinch', d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, s0: S.view.s, wx: (mid.x - S.view.tx) / S.view.s, wy: (mid.y - S.view.ty) / S.view.s};
+    box = null;
+    return;
+  }
+  if (ptrs.size > 2) return;
+  const w = toWorld(e.clientX, e.clientY);
+  const handle = e.target.closest('[data-handle]');
+  const itemEl = e.target.closest('[data-id]');
+  const start = {cx: e.clientX, cy: e.clientY, w};
+  if (handle){
+    const it = selItems()[0];
+    gesture = Object.assign({type:'rotate', it, moved:false}, start);
+    return;
+  }
+  if (S.tool === 'pan'){ gesture = Object.assign({type:'pan', tx: S.view.tx, ty: S.view.ty}, start); return; }
+  if (itemEl){
+    const id = itemEl.getAttribute('data-id');
+    const it = S.cur.items.find(i => i.id === id);
+    if (S.tool === 'note' && it.type === 'note'){ gesture = Object.assign({type:'tapnote', it, moved:false}, start); return; }
+    const wasSel = S.sel.has(id);
+    if (!wasSel){ S.sel = new Set([id]); render(); }
+    const orig = {};
+    selItems().forEach(i => orig[i.id] = {x: i.x, y: i.y});
+    gesture = Object.assign({type:'move', orig, moved:false, id, wasSel}, start);
+    return;
+  }
+  if (S.tool === 'select'){ gesture = Object.assign({type:'box', moved:false}, start); box = {a: w, b: w}; return; }
+  gesture = Object.assign({type:'tap-or-pan', tx: S.view.tx, ty: S.view.ty, moved:false}, start);
+});
+svg.addEventListener('pointermove', e => {
+  if (!ptrs.has(e.pointerId)) return;
+  ptrs.set(e.pointerId, {x: e.clientX, y: e.clientY});
+  if (!gesture) return;
+  if (gesture.type === 'pinch'){
+    if (ptrs.size < 2) return;
+    const [a, b] = [...ptrs.values()];
+    const d = Math.hypot(a.x - b.x, a.y - b.y);
+    const mid = localPt((a.x + b.x) / 2, (a.y + b.y) / 2);
+    const s = Math.max(0.2, Math.min(5, gesture.s0 * d / gesture.d0));
+    S.view = {s, tx: mid.x - gesture.wx * s, ty: mid.y - gesture.wy * s};
+    applyView();
+    return;
+  }
+  const dist = Math.hypot(e.clientX - gesture.cx, e.clientY - gesture.cy);
+  const w = toWorld(e.clientX, e.clientY);
+  if (!gesture.moved && dist < 6) return;
+  if (gesture.type === 'pan' || gesture.type === 'tap-or-pan'){
+    gesture.moved = true;
+    S.view.tx = gesture.tx + (e.clientX - gesture.cx); S.view.ty = gesture.ty + (e.clientY - gesture.cy);
+    applyView();
+  } else if (gesture.type === 'move'){
+    if (!gesture.moved){ gesture.moved = true; pushUndo(); }
+    const dx = w.x - gesture.w.x, dy = w.y - gesture.w.y;
+    S.cur.items.forEach(i => { const o = gesture.orig[i.id]; if (o){ i.x = Math.round(o.x + dx); i.y = Math.round(o.y + dy); } });
+    render();
+  } else if (gesture.type === 'rotate' && gesture.it){
+    if (!gesture.moved){ gesture.moved = true; pushUndo(); }
+    const it = gesture.it;
+    let ang = Math.atan2(w.x - it.x, -(w.y - it.y)) * 180 / Math.PI;
+    ang = Math.round(ang / 5) * 5;
+    it.rot = (ang + 360) % 360;
+    render();
+  } else if (gesture.type === 'box'){
+    gesture.moved = true; box.b = w; render();
+  } else if (gesture.type === 'tapnote'){
+    gesture.moved = true;
+  }
+});
+function endPtr(e){
+  if (!ptrs.has(e.pointerId)) return;
+  ptrs.delete(e.pointerId);
+  if (!gesture) return;
+  if (gesture.type === 'pinch'){ if (ptrs.size === 0) gesture = null; else gesture = {type:'none'}; render(); return; }
+  if (e.type === 'pointercancel'){ gesture = null; box = null; render(); return; }
+  const g = gesture; gesture = null;
+  if (g.type === 'tap-or-pan' && !g.moved){
+    if (S.sel.size){ S.sel.clear(); render(); return; }
+    if (S.tool === 'place') placeFoot(g.w.x, g.w.y);
+    else if (S.tool === 'note') addNote(g.w.x, g.w.y);
+  } else if (g.type === 'tapnote' && !g.moved){
+    editNote(g.it);
+  } else if (g.type === 'move'){
+    if (g.moved) saveCanvasSoon();
+    else if (g.wasSel && S.sel.size > 1 && S.tool !== 'select'){ S.sel = new Set([g.id]); }
+    render();
+  } else if (g.type === 'rotate'){
+    if (g.moved) saveCanvasSoon();
+    render();
+  } else if (g.type === 'box'){
+    if (box && g.moved){
+      const x0 = Math.min(box.a.x, box.b.x), x1 = Math.max(box.a.x, box.b.x), y0 = Math.min(box.a.y, box.b.y), y1 = Math.max(box.a.y, box.b.y);
+      S.sel = new Set(S.cur.items.filter(i => i.x >= x0 && i.x <= x1 && i.y >= y0 && i.y <= y1).map(i => i.id));
+    } else S.sel.clear();
+    box = null; render();
+  } else if (g.type === 'pan' || g.type === 'tap-or-pan'){ render(); }
+}
+svg.addEventListener('pointerup', endPtr);
+svg.addEventListener('pointercancel', endPtr);
+svg.addEventListener('wheel', e => {
+  e.preventDefault();
+  const p = localPt(e.clientX, e.clientY);
+  const wx = (p.x - S.view.tx) / S.view.s, wy = (p.y - S.view.ty) / S.view.s;
+  const s = Math.max(0.2, Math.min(5, S.view.s * Math.exp(-e.deltaY * 0.0015)));
+  S.view = {s, tx: p.x - wx * s, ty: p.y - wy * s};
+  render();
+}, {passive:false});
+window.addEventListener('resize', () => { if (S.cur) render(); });
+
+document.addEventListener('keydown', e => {
+  if (!S.cur || document.querySelector('.modal')) return;
+  if (e.target.matches('input,textarea,select')) return;
+  const mod = e.ctrlKey || e.metaKey;
+  if ((e.key === 'Delete' || e.key === 'Backspace') && S.sel.size){ e.preventDefault(); deleteSel(); }
+  else if (mod && e.key.toLowerCase() === 'z'){ e.preventDefault(); (e.shiftKey ? $('#redo') : $('#undo')).click(); }
+  else if (mod && e.key.toLowerCase() === 'c'){ copySel(); }
+  else if (mod && e.key.toLowerCase() === 'v'){ $('#paste').click(); }
+  else if (mod && e.key.toLowerCase() === 'd'){ e.preventDefault(); duplicateSel(); }
+  else if (e.key === 'Escape'){ S.sel.clear(); render(); }
+});
+
+// ---------- playback ----------
+const SPEEDS = [1100, 650, 380];
+$('#speed').onclick = () => { S.speed = (S.speed + 1) % 3; if (S.playing){ stopPlay(); startPlay(); } renderTools(); };
+$('#play').onclick = () => { if (S.playing) stopPlay(); else startPlay(); };
+function startPlay(){
+  const lead = feetOf('lead'), fol = feetOf('follow');
+  const n = Math.max(lead.length, fol.length);
+  if (!n) return;
+  S.sel.clear();
+  let k = 0;
+  const step = () => {
+    const ids = [lead[k], fol[k]].filter(Boolean);
+    S.hl = new Set(ids.map(i => i.id));
+    const bc = $('#bigcount'); bc.classList.remove('hidden'); bc.textContent = (lead[k] || fol[k]).count;
+    render();
+    k = (k + 1) % n;
+  };
+  step();
+  S.playing = setInterval(step, SPEEDS[S.speed]);
+  renderTools();
+}
+function stopPlay(){
+  if (!S.playing) return;
+  clearInterval(S.playing); S.playing = null; S.hl.clear();
+  $('#bigcount').classList.add('hidden');
+  render();
+}
+
+// ---------- video ----------
+const video = $('#video');
+let noteT = null;
+function note(t, temp){
+  const n = $('#vidNote'); n.textContent = t;
+  clearTimeout(noteT);
+  if (temp){
+    showToast(t);
+    noteT = setTimeout(updateVidNote, 3500);
+  }
+}
+let toastEl = null, toastT = null;
+function showToast(t){
+  if (!toastEl){ toastEl = h('div', {style:'position:fixed;left:50%;bottom:120px;transform:translateX(-50%);background:#1c1c1e;color:#fff;padding:9px 14px;border-radius:20px;font-size:13.5px;z-index:60;max-width:90vw;text-align:center;pointer-events:none'}, document.body); }
+  toastEl.textContent = t; toastEl.style.display = 'block';
+  clearTimeout(toastT); toastT = setTimeout(() => toastEl.style.display = 'none', 2600);
+}
+const CAN_EMBED = !(window.claude && typeof window.claude.use === 'function');
+if (CAN_EMBED) $('#vidEmptyText').textContent = 'Paste a YouTube or Google Drive link below, or load a clip from your phone.';
+function parseLink(u){
+  u = (u || '').trim();
+  let m = u.match(/(?:youtube\.com\/(?:watch\?(?:[^#]*&)?v=|shorts\/|embed\/|live\/)|youtu\.be\/|youtube-nocookie\.com\/embed\/)([\w-]{11})/i);
+  if (m) return {type:'yt', id:m[1]};
+  m = u.match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?(?:[^#]*&)?id=)([\w-]{10,})/i);
+  if (m) return {type:'drive', id:m[1]};
+  return null;
+}
+let ytPlayer = null, ytReady = null, ytErr = '';
+function loadYT(){
+  if (ytReady) return ytReady;
+  ytReady = new Promise(res => {
+    window.onYouTubeIframeAPIReady = () => res(true);
+    const sc = document.createElement('script');
+    sc.src = 'https://www.youtube.com/iframe_api';
+    sc.onerror = () => res(false);
+    document.head.appendChild(sc);
+  });
+  return ytReady;
+}
+async function showYT(id){
+  ytErr = '';
+  const ok = await loadYT();
+  if (!ok || !window.YT || !YT.Player){ ytErr = 'YouTube couldn’t load. Check your connection.'; updateVidNote(); return; }
+  if (ytPlayer && ytPlayer.cueVideoById){ ytPlayer.cueVideoById(id); updateVidNote(); return; }
+  ytPlayer = new YT.Player('yt', {
+    videoId: id, width:'100%', height:'100%',
+    playerVars: {playsinline:1, rel:0, modestbranding:1},
+    events: {onError: e => {
+      ytErr = (e.data === 101 || e.data === 150) ? 'The owner of this video doesn’t allow it to play outside YouTube. Use Open ↗ instead.' : 'This video couldn’t be played. Check the link.';
+      updateVidNote();
+    }}
+  });
+  updateVidNote();
+}
+function ytCall(fn){ try { if (ytPlayer && typeof ytPlayer[fn] === 'function') return true; } catch(e){} return false; }
+S.vmode = 'none';
+function showMedia(kind){
+  S.vmode = kind;
+  video.classList.toggle('hidden', kind !== 'file');
+  $('#ytwrap').classList.toggle('hidden', kind !== 'yt');
+  $('#drive').classList.toggle('hidden', kind !== 'drive');
+  $('#vidEmpty').classList.toggle('hidden', kind !== 'none');
+  if (kind !== 'file'){ try { video.pause(); } catch(e){} }
+  if (kind !== 'yt' && ytCall('pauseVideo')) try { ytPlayer.pauseVideo(); } catch(e){}
+  if (kind !== 'drive' && $('#drive').getAttribute('src')) $('#drive').removeAttribute('src');
+}
+function applyMedia(){
+  const c = S.cur; if (!c) return;
+  const sess = S.sessionVideos[c.id];
+  const lk = CAN_EMBED ? parseLink(c.link) : null;
+  if (sess){ if (video.src !== sess.url) video.src = sess.url; showMedia('file'); }
+  else if (lk && lk.type === 'yt'){ showMedia('yt'); showYT(lk.id); }
+  else if (lk && lk.type === 'drive'){ showMedia('drive'); const src = 'https://drive.google.com/file/d/' + lk.id + '/preview'; if ($('#drive').getAttribute('src') !== src) $('#drive').setAttribute('src', src); }
+  else if (c.videoId){ video.src = '/_blob/' + encodeURIComponent(c.videoId); showMedia('file'); }
+  else { video.removeAttribute('src'); try { video.load(); } catch(e){} showMedia('none'); }
+  updateVidNote();
+}
+function updateVidNote(){
+  const c = S.cur; if (!c) return;
+  let t = '';
+  if (S.vmode === 'file'){
+    const sess = S.sessionVideos[c.id];
+    t = sess ? (sess.note || 'Playing from your phone for this session.') : ('Clip saved with this step map' + (c.videoName ? ' (' + c.videoName + ')' : '') + '.');
+  } else if (S.vmode === 'yt') t = ytErr || 'Playing from YouTube.';
+  else if (S.vmode === 'drive') t = 'Playing from Google Drive. The file must be shared as “Anyone with the link”. Use the player’s own controls for speed.';
+  else if (c.link && !CAN_EMBED) t = 'This version can’t play links inside the player, so Open ↗ plays it in a new tab.';
+  else if (c.link) t = 'That link isn’t a YouTube or Google Drive video link.';
+  else t = CAN_EMBED ? 'Paste a YouTube or Google Drive link, or load a clip from your phone.' : 'Links open in a new tab. Load the clip itself to watch it here beside the map.';
+  $('#vidNote').textContent = t;
+}
+function setupVideo(){
+  const c = S.cur;
+  $$('#vid .mir').forEach(e => e.classList.remove('mir')); $('#vMirror').classList.remove('on');
+  $$('#vid [data-rate]').forEach(b => b.classList.toggle('on', b.dataset.rate === '1'));
+  video.playbackRate = 1;
+  $('#link').value = c.link || '';
+  syncLink();
+  applyMedia();
+}
+function syncLink(){
+  const v = ($('#link').value || '').trim();
+  const a = $('#openLink');
+  if (/^https?:\/\//i.test(v)){ a.href = v; a.style.opacity = 1; a.style.pointerEvents = 'auto'; }
+  else { a.removeAttribute('href'); a.style.opacity = .4; a.style.pointerEvents = 'none'; }
+}
+$('#link').addEventListener('input', syncLink);
+$('#link').addEventListener('change', () => { S.cur.link = $('#link').value.trim(); delete S.sessionVideos[S.cur.id]; saveCanvasSoon(); applyMedia(); });
+$('#link').addEventListener('paste', () => setTimeout(() => $('#link').dispatchEvent(new Event('change')), 50));
+$$('.vfile').forEach(inp => inp.addEventListener('change', async () => {
+  const f = inp.files && inp.files[0]; inp.value = '';
+  if (!f || !S.cur) return;
+  const c = S.cur;
+  const url = URL.createObjectURL(f);
+  S.sessionVideos[c.id] = {url};
+  video.src = url; showMedia('file');
+  const MAX = 20 * 1024 * 1024;
+  if (S.assets && f.size <= MAX){
+    $('#vidNote').textContent = 'Saving clip…';
+    try {
+      const r = await S.assets.upload(f);
+      c.videoId = r.id; c.videoName = f.name;
+      S.sessionVideos[c.id].note = 'Clip saved with this step map.';
+      saveCanvasSoon();
+    } catch(e){
+      S.sessionVideos[c.id].note = 'Couldn’t save the clip. It plays for this session only.';
+    }
+  } else if (f.size > MAX){
+    S.sessionVideos[c.id].note = 'Over 20 MB, so it plays now but isn’t saved. Trim the clip to save it with the map.';
+  } else {
+    S.sessionVideos[c.id].note = 'Playing for this session only.';
+  }
+  if (S.cur === c) updateVidNote();
+}));
+$$('#vid [data-rate]').forEach(b => b.onclick = () => {
+  const r = +b.dataset.rate;
+  if (S.vmode === 'yt' && ytCall('setPlaybackRate')) ytPlayer.setPlaybackRate(r); else video.playbackRate = r;
+  if (S.vmode === 'drive') showToast('Use the Drive player\u2019s own settings for speed.');
+  $$('#vid [data-rate]').forEach(x => x.classList.toggle('on', x === b));
+});
+$('#vMirror').onclick = () => { const on = !$('#vMirror').classList.contains('on'); [video, $('#ytwrap'), $('#drive')].forEach(e => e.classList.toggle('mir', on)); $('#vMirror').classList.toggle('on', on); };
+$('#vBack').onclick = () => {
+  if (S.vmode === 'yt' && ytCall('seekTo')){ try { ytPlayer.seekTo(Math.max(0, ytPlayer.getCurrentTime() - 2), true); } catch(e){} }
+  else try { video.currentTime = Math.max(0, video.currentTime - 2); } catch(e){}
+};
+video.addEventListener('error', () => {
+  if (S.vmode === 'file' && S.cur && S.cur.videoId && !S.sessionVideos[S.cur.id]){ $('#vidEmpty').classList.remove('hidden'); $('#vidNote').textContent = 'The saved clip could not be loaded here. Load it again from your phone.'; }
+});
+
+// ---------- start ----------
+renderLib();
+setStatus('local');
+connect();
+})();
+</script>
+</body>
+</html>
