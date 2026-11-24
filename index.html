@@ -149,7 +149,7 @@ svg#floor{position:absolute;inset:0;width:100%;height:100%;touch-action:none;use
       </div>
       <div class="vctl">
         <div class="vrow">
-          <button data-rate="0.5">0.5×</button><button data-rate="0.75">0.75×</button><button data-rate="1" class="on">1×</button>
+          <button id="rDown" title="Slower">−</button><button id="rVal" title="Choose speed" style="min-width:58px;justify-content:center;font-weight:700">1.0×</button><button id="rUp" title="Faster">+</button>
           <button id="vMirror" title="Mirror video">⇋ Mirror</button>
           <button id="vBack" title="Back 2 seconds">↺ 2s</button>
           <button id="vSync" title="Sync steps to the video">⏱ Sync steps</button>
@@ -198,7 +198,7 @@ svg#floor{position:absolute;inset:0;width:100%;height:100%;touch-action:none;use
           <button id="paste" title="Paste copied steps" class="hidden">📋 Paste</button>
           <span class="sep"></span>
           <button id="play" title="Play through steps">▶ Play</button>
-          <button id="speed" title="Playback speed">Normal</button>
+          <button id="speed" title="Playback speed">1.0×</button>
           <button id="fit" title="Fit everything in view">⤢ Fit</button>
         </div>
       </div>
@@ -733,7 +733,6 @@ function renderTools(){
   $('#paste').classList.toggle('hidden', !S.clip);
   $('#play').textContent = videoSynced() ? (vPlaying() ? '⏸ Pause video' : '▶ Play video') : (S.playing ? '■ Stop' : '▶ Play');
   $('#vSync').classList.toggle('on', !!S.stamp);
-  $('#speed').textContent = ['Slow','Normal','Fast'][S.speed];
 }
 
 let ctxKey = '';
@@ -1037,8 +1036,37 @@ document.addEventListener('keydown', e => {
 });
 
 // ---------- playback ----------
-const SPEEDS = [1100, 650, 380];
-$('#speed').onclick = () => { S.speed = (S.speed + 1) % 3; if (S.playing){ stopPlay(); startPlay(); } renderTools(); };
+S.rate = 1;
+const PRESETS = [0.1, 0.2, 0.25, 0.3, 0.4, 0.5, 0.6, 0.75, 0.8, 0.9, 1, 1.1, 1.2, 1.25, 1.5, 1.75, 2, 2.5, 3];
+const fmtR = r => (Math.round(r * 100) / 100).toFixed(r * 10 % 1 ? 2 : 1) + '×';
+let rateCheckT = null;
+function setRate(r){
+  r = Math.max(0.1, Math.min(3, Math.round(r * 100) / 100));
+  S.rate = r;
+  try { video.playbackRate = r; } catch(e){}
+  if (S.vmode === 'yt' && ytCall('setPlaybackRate')){
+    try { ytPlayer.setPlaybackRate(r); } catch(e){}
+    clearTimeout(rateCheckT);
+    rateCheckT = setTimeout(() => {
+      try {
+        const got = ytPlayer.getPlaybackRate();
+        if (Math.abs(got - r) > 0.001) showToast('YouTube only plays between 0.25× and 2×, so the video is at ' + fmtR(got) + '. Load the clip from your phone for 0.1× to 3×.');
+      } catch(e){}
+    }, 400);
+  } else if (S.vmode === 'drive') showToast('Drive videos use their own speed setting. The canvas playback still uses ' + fmtR(r) + '.');
+  if (S.playing){ stopPlay(); startPlay(); }
+  syncRateUI();
+}
+function syncRateUI(){
+  $('#rVal').textContent = fmtR(S.rate);
+  $('#speed').textContent = fmtR(S.rate);
+  $('#rDown').disabled = S.rate <= 0.1; $('#rUp').disabled = S.rate >= 3;
+}
+function rateSheet(){ sheet('Speed', PRESETS.map(r => ({label: (Math.abs(r - S.rate) < 0.001 ? '✓ ' : '') + fmtR(r) + (r === 1 ? '  (normal)' : ''), fn: () => setRate(r)}))); }
+$('#rDown').onclick = () => setRate(S.rate - (S.rate <= 1 ? 0.1 : 0.1));
+$('#rUp').onclick = () => setRate(S.rate + 0.1);
+$('#rVal').onclick = rateSheet;
+$('#speed').onclick = rateSheet;
 $('#play').onclick = () => {
   if (videoSynced()){ if (vPlaying()) vPause(); else vPlay(); setTimeout(renderTools, 150); return; }
   if (S.playing) stopPlay(); else startPlay();
@@ -1057,7 +1085,7 @@ function startPlay(){
     k = (k + 1) % n;
   };
   step();
-  S.playing = setInterval(step, SPEEDS[S.speed]);
+  S.playing = setInterval(step, Math.round(650 / S.rate));
   renderTools();
 }
 function stopPlay(){
@@ -1114,7 +1142,7 @@ async function showYT(id){
   ytPlayer = new YT.Player('yt', {
     videoId: id, width:'100%', height:'100%',
     playerVars: {playsinline:1, rel:0, modestbranding:1},
-    events: {onError: e => {
+    events: {onReady: () => { if (S.rate !== 1) setRate(S.rate); }, onError: e => {
       ytErr = (e.data === 101 || e.data === 150) ? 'The owner of this video doesn’t allow it to play outside YouTube. Use Open ↗ instead.' : 'This video couldn’t be played. Check the link.';
       updateVidNote();
     }}
@@ -1137,7 +1165,7 @@ function applyMedia(){
   const c = S.cur; if (!c) return;
   const sess = S.sessionVideos[c.id];
   const lk = CAN_EMBED ? parseLink(c.link) : null;
-  if (sess){ if (video.src !== sess.url) video.src = sess.url; showMedia('file'); }
+  if (sess){ if (video.src !== sess.url) video.src = sess.url; showMedia('file'); video.playbackRate = S.rate; }
   else if (lk && lk.type === 'yt'){ showMedia('yt'); showYT(lk.id); }
   else if (lk && lk.type === 'drive'){ showMedia('drive'); const src = 'https://drive.google.com/file/d/' + lk.id + '/preview'; if ($('#drive').getAttribute('src') !== src) $('#drive').setAttribute('src', src); }
   else if (c.videoId){ video.src = '/_blob/' + encodeURIComponent(c.videoId); showMedia('file'); }
@@ -1160,8 +1188,6 @@ function updateVidNote(){
 function setupVideo(){
   const c = S.cur;
   $$('#vid .mir').forEach(e => e.classList.remove('mir')); $('#vMirror').classList.remove('on');
-  $$('#vid [data-rate]').forEach(b => b.classList.toggle('on', b.dataset.rate === '1'));
-  video.playbackRate = 1;
   $('#link').value = c.link || '';
   syncLink();
   applyMedia();
@@ -1181,7 +1207,7 @@ $$('.vfile').forEach(inp => inp.addEventListener('change', async () => {
   const c = S.cur;
   const url = URL.createObjectURL(f);
   S.sessionVideos[c.id] = {url};
-  video.src = url; showMedia('file');
+  video.src = url; showMedia('file'); video.playbackRate = S.rate;
   const MAX = 20 * 1024 * 1024;
   if (S.assets && f.size <= MAX){
     $('#vidNote').textContent = 'Saving clip…';
@@ -1200,17 +1226,13 @@ $$('.vfile').forEach(inp => inp.addEventListener('change', async () => {
   }
   if (S.cur === c) updateVidNote();
 }));
-$$('#vid [data-rate]').forEach(b => b.onclick = () => {
-  const r = +b.dataset.rate;
-  if (S.vmode === 'yt' && ytCall('setPlaybackRate')) ytPlayer.setPlaybackRate(r); else video.playbackRate = r;
-  if (S.vmode === 'drive') showToast('Use the Drive player\u2019s own settings for speed.');
-  $$('#vid [data-rate]').forEach(x => x.classList.toggle('on', x === b));
-});
+
 $('#vMirror').onclick = () => { const on = !$('#vMirror').classList.contains('on'); [video, $('#ytwrap'), $('#drive')].forEach(e => e.classList.toggle('mir', on)); $('#vMirror').classList.toggle('on', on); };
 $('#vBack').onclick = () => {
   if (S.vmode === 'yt' && ytCall('seekTo')){ try { ytPlayer.seekTo(Math.max(0, ytPlayer.getCurrentTime() - 2), true); } catch(e){} }
   else try { video.currentTime = Math.max(0, video.currentTime - 2); } catch(e){}
 };
+video.addEventListener('loadedmetadata', () => { video.playbackRate = S.rate; });
 video.addEventListener('error', () => {
   if (S.vmode === 'file' && S.cur && S.cur.videoId && !S.sessionVideos[S.cur.id]){ $('#vidEmpty').classList.remove('hidden'); $('#vidNote').textContent = 'The saved clip could not be loaded here. Load it again from your phone.'; }
 });
