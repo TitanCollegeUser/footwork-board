@@ -72,6 +72,8 @@ svg#floor{position:absolute;inset:0;width:100%;height:100%;touch-action:none;use
 .chip{padding:6px 0;min-width:38px;justify-content:center;border-radius:20px;font-weight:650}
 .chip.amp{font-weight:500;color:var(--mute)}
 .chip.on{color:#fff}
+.stampbtn{padding:9px 16px;font-weight:700;font-size:15px}
+.tbadge{font-size:9px;font-weight:700;pointer-events:none}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;flex:none}
 .seg button{border:none;border-radius:0;padding:7px 10px}
 .seg button+button{border-left:1px solid var(--line)}
@@ -150,6 +152,7 @@ svg#floor{position:absolute;inset:0;width:100%;height:100%;touch-action:none;use
           <button data-rate="0.5">0.5×</button><button data-rate="0.75">0.75×</button><button data-rate="1" class="on">1×</button>
           <button id="vMirror" title="Mirror video">⇋ Mirror</button>
           <button id="vBack" title="Back 2 seconds">↺ 2s</button>
+          <button id="vSync" title="Sync steps to the video">⏱ Sync steps</button>
           <label class="btn">Replace<input type="file" accept="video/*" class="vfile hidden"></label>
         </div>
         <div class="vrow">
@@ -569,7 +572,7 @@ async function openCanvas(id){
   setStatus('loading');
   const c = await loadCanvas(id);
   setStatus(S.coll ? 'saved' : 'local');
-  S.cur = c; S.sel.clear(); S.hl.clear(); S.undo = []; S.redo = [];
+  S.cur = c; S.sel.clear(); S.hl.clear(); S.undo = []; S.redo = []; S.stamp = null; lastActive = -2;
   S.next = {lead:null, follow:null};
   S.side = {lead: oppositeOfLast('lead', 'L'), follow: oppositeOfLast('follow', 'R')};
   S.who = 'lead';
@@ -584,7 +587,7 @@ async function openCanvas(id){
 function closeCanvas(){
   stopPlay();
   if (S.cur){ clearTimeout(saveT); const c = S.cur; c.updated = Date.now(); const m = S.lib.canvases.find(x => x.id === c.id); if (m){ m.updated = c.updated; m.mode = c.mode; } writeDoc('c-' + c.id, c); saveLib(); }
-  S.cur = null;
+  S.cur = null; S.stamp = null;
   const v = $('#video'); v.pause(); if (ytCall('pauseVideo')) try { ytPlayer.pauseVideo(); } catch(e){}
   $('#ed').classList.add('hidden'); $('#lib').classList.remove('hidden');
   renderLib();
@@ -697,7 +700,7 @@ function render(){
       sv('circle', {r: label.length > 1 ? 15 : 13, fill:col, stroke: brk ? '#f2b01e' : '#fff', 'stroke-width': brk ? 4 : 2}, badge);
       const t = sv('text', {y:4.6, 'text-anchor':'middle', class:'cnt'}, badge); t.textContent = it.count;
       const sideG = sv('g', {transform:`translate(0 24) rotate(${-(it.rot || 0)})`}, g);
-      const st = sv('text', {y:3.5, 'text-anchor':'middle', class:'sidel', fill:col}, sideG); st.textContent = it.side;
+      const st = sv('text', {y:3.5, 'text-anchor':'middle', class:'sidel', fill:col}, sideG); st.textContent = it.side + (typeof it.t === 'number' ? ' ⏱' : '');
       if (sel && S.sel.size === 1){
         sv('line', {x1:0, y1:-36, x2:0, y2:-58, stroke:'#d9480f', 'stroke-width':2}, g);
         const hr = Math.max(9, 13 / S.view.s);
@@ -728,7 +731,8 @@ function renderTools(){
   $$('[data-tool]').forEach(b => b.classList.toggle('on', b.dataset.tool === S.tool));
   $('#undo').disabled = !S.undo.length; $('#redo').disabled = !S.redo.length;
   $('#paste').classList.toggle('hidden', !S.clip);
-  $('#play').textContent = S.playing ? '■ Stop' : '▶ Play';
+  $('#play').textContent = videoSynced() ? (vPlaying() ? '⏸ Pause video' : '▶ Play video') : (S.playing ? '■ Stop' : '▶ Play');
+  $('#vSync').classList.toggle('on', !!S.stamp);
   $('#speed').textContent = ['Slow','Normal','Fast'][S.speed];
 }
 
@@ -737,6 +741,21 @@ function renderCtx(){
   const row = $('#ctxRow'), c = S.cur; if (!c) return;
   const selItems = c.items.filter(i => S.sel.has(i.id));
   row.innerHTML = '';
+  if (S.stamp){
+    const steps = stepsList(), k = S.stamp.k;
+    if (k < steps.length){
+      const st = steps[k];
+      h('button', {class:'primary stampbtn', onclick: stampStep}, row, 'Tap: step ' + (k + 1) + ' of ' + steps.length + ' (count ' + st.count + ')');
+    } else {
+      h('span', {class:'small', style:'padding:6px 2px;font-weight:600'}, row, 'All ' + steps.length + ' steps synced.');
+    }
+    h('button', {disabled: k === 0 ? '' : null, onclick: () => { if (S.stamp.k > 0){ S.stamp.k--; stepsList()[S.stamp.k].feet.forEach(f => delete f.t); S.hl = new Set(stepsList()[S.stamp.k].feet.map(f => f.id)); changed(); } }}, row, '↶ Back');
+    h('button', {title:'Shift all timings earlier', onclick: () => nudgeAll(-0.1)}, row, '−0.1s');
+    h('button', {title:'Shift all timings later', onclick: () => nudgeAll(0.1)}, row, '+0.1s');
+    h('button', {class:'danger', onclick: () => { pushUndo(); c.items.forEach(i => delete i.t); S.stamp.k = 0; S.hl = new Set((stepsList()[0] || {feet:[]}).feet.map(f => f.id)); changed(); }}, row, 'Clear timing');
+    h('button', {onclick: endStamp}, row, 'Done');
+    return;
+  }
   if (selItems.length){
     const feet = selItems.filter(i => i.type === 'foot');
     if (selItems.length === 1 && feet.length === 1){
@@ -747,6 +766,10 @@ function renderCtx(){
         const b = h('button', {class:'chip' + (x.includes('&') ? ' amp' : '') + (f.count === x ? ' on' : ''), style: f.count === x ? 'background:' + col + ';border-color:' + col : null, onclick: () => { pushUndo(); f.count = x; changed(); }}, row, x);
       });
       h('span', {class:'sep'}, row);
+    }
+    if (selItems.length === 1 && typeof selItems[0].t === 'number' && vTime() !== null){
+      const tt = selItems[0].t;
+      h('button', {title:'Play the video from this step', onclick: () => { vSeek(Math.max(0, tt - 0.6)); vPlay(); S.sel.clear(); render(); }}, row, '▶ ' + fmtT(tt));
     }
     h('button', {title:'Rotate left', onclick: () => rotateSel(-15)}, row, '⟲');
     h('button', {title:'Rotate right', onclick: () => rotateSel(15)}, row, '⟳');
@@ -841,7 +864,7 @@ function mirrorSel(){
   changed();
 }
 function cloneItems(arr, dx, dy){
-  return arr.map(i => Object.assign(clone(i), {id: uidGen(), x: i.x + dx, y: i.y + dy}));
+  return arr.map(i => { const o = Object.assign(clone(i), {id: uidGen(), x: i.x + dx, y: i.y + dy}); delete o.t; return o; });
 }
 function duplicateSel(){
   const arr = selItems(); if (!arr.length) return;
@@ -1016,7 +1039,10 @@ document.addEventListener('keydown', e => {
 // ---------- playback ----------
 const SPEEDS = [1100, 650, 380];
 $('#speed').onclick = () => { S.speed = (S.speed + 1) % 3; if (S.playing){ stopPlay(); startPlay(); } renderTools(); };
-$('#play').onclick = () => { if (S.playing) stopPlay(); else startPlay(); };
+$('#play').onclick = () => {
+  if (videoSynced()){ if (vPlaying()) vPause(); else vPlay(); setTimeout(renderTools, 150); return; }
+  if (S.playing) stopPlay(); else startPlay();
+};
 function startPlay(){
   const lead = feetOf('lead'), fol = feetOf('follow');
   const n = Math.max(lead.length, fol.length);
@@ -1188,6 +1214,85 @@ $('#vBack').onclick = () => {
 video.addEventListener('error', () => {
   if (S.vmode === 'file' && S.cur && S.cur.videoId && !S.sessionVideos[S.cur.id]){ $('#vidEmpty').classList.remove('hidden'); $('#vidNote').textContent = 'The saved clip could not be loaded here. Load it again from your phone.'; }
 });
+
+// ---------- video sync ----------
+function fmtT(t){ const m = Math.floor(t / 60), s = (t - m * 60).toFixed(1); return m + ':' + (s < 10 ? '0' : '') + s; }
+function vTime(){
+  if (S.vmode === 'yt' && ytCall('getCurrentTime')){ try { return ytPlayer.getCurrentTime() || 0; } catch(e){ return null; } }
+  if (S.vmode === 'file' && video.getAttribute('src')) return video.currentTime || 0;
+  return null;
+}
+function vPlaying(){
+  if (S.vmode === 'yt' && ytCall('getPlayerState')){ try { return ytPlayer.getPlayerState() === 1; } catch(e){ return false; } }
+  if (S.vmode === 'file') return !video.paused && !video.ended;
+  return false;
+}
+function vPlay(){ if (S.vmode === 'yt' && ytCall('playVideo')) ytPlayer.playVideo(); else if (S.vmode === 'file') video.play().catch(() => {}); }
+function vPause(){ if (S.vmode === 'yt' && ytCall('pauseVideo')) ytPlayer.pauseVideo(); else if (S.vmode === 'file') video.pause(); }
+function vSeek(t){ if (S.vmode === 'yt' && ytCall('seekTo')) ytPlayer.seekTo(t, true); else if (S.vmode === 'file') try { video.currentTime = t; } catch(e){} }
+function stepsList(){
+  if (!S.cur) return [];
+  const lead = feetOf('lead'), fol = feetOf('follow'), n = Math.max(lead.length, fol.length), out = [];
+  for (let k = 0; k < n; k++){
+    const feet = [lead[k], fol[k]].filter(Boolean);
+    const timed = feet.find(f => typeof f.t === 'number');
+    out.push({k, feet, t: timed ? timed.t : null, count: feet[0].count});
+  }
+  return out;
+}
+function videoSynced(){ return !!(S.cur && vTime() !== null && S.cur.items.some(i => i.type === 'foot' && typeof i.t === 'number')); }
+function startStamp(){
+  if (vTime() === null){ showToast('Load a YouTube link or a clip first.'); return; }
+  const steps = stepsList();
+  if (!steps.length){ showToast('Place your steps on the floor first.'); return; }
+  stopPlay();
+  pushUndo();
+  const firstUntimed = steps.findIndex(st => st.t === null);
+  S.stamp = {k: firstUntimed === -1 ? 0 : firstUntimed};
+  S.sel.clear(); S.tool = 'select';
+  S.hl = new Set(steps[S.stamp.k].feet.map(f => f.id));
+  showToast('Play the video and tap the orange button on each step.');
+  render();
+}
+function stampStep(){
+  const steps = stepsList(), k = S.stamp.k, t = vTime();
+  if (t === null || k >= steps.length) return;
+  steps[k].feet.forEach(f => f.t = Math.round(t * 100) / 100);
+  S.stamp.k = k + 1;
+  const nx = steps[k + 1];
+  S.hl = new Set((nx || steps[k]).feet.map(f => f.id));
+  changed();
+}
+function nudgeAll(d){
+  pushUndo();
+  S.cur.items.forEach(i => { if (typeof i.t === 'number') i.t = Math.max(0, Math.round((i.t + d) * 100) / 100); });
+  showToast('Timing moved ' + (d > 0 ? 'later' : 'earlier') + ' by ' + Math.abs(d) + 's');
+  changed();
+}
+function endStamp(){ S.stamp = null; S.hl.clear(); lastActive = -2; $('#bigcount').classList.add('hidden'); changed(); }
+$('#vSync').onclick = () => { if (S.stamp) endStamp(); else startStamp(); };
+
+let lastActive = -2, lastPlayingState = null;
+function followLoop(){
+  requestAnimationFrame(followLoop);
+  if (!S.cur || S.stamp || S.playing) return;
+  const now = vTime();
+  const playingNow = vPlaying();
+  if (playingNow !== lastPlayingState){ lastPlayingState = playingNow; if (videoSynced()) renderTools(); }
+  if (now === null){ if (lastActive !== -2){ lastActive = -2; S.hl.clear(); $('#bigcount').classList.add('hidden'); render(); } return; }
+  const steps = stepsList();
+  let active = -1, best = -1;
+  steps.forEach(st => { if (st.t !== null && st.t <= now + 0.03 && st.t > best){ best = st.t; active = st.k; } });
+  if (active === -1 && !steps.some(st => st.t !== null)) active = -2;
+  if (active !== lastActive){
+    lastActive = active;
+    const bc = $('#bigcount');
+    if (active >= 0){ S.hl = new Set(steps[active].feet.map(f => f.id)); bc.textContent = steps[active].count; bc.classList.remove('hidden'); }
+    else { S.hl.clear(); bc.classList.add('hidden'); }
+    render();
+  }
+}
+requestAnimationFrame(followLoop);
 
 // ---------- start ----------
 renderLib();
